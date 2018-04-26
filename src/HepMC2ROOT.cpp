@@ -76,7 +76,8 @@ int main (int argc, char **argv){
   //-------------------SET UP DATA
   vector<string> filesModel1;
   //=============PYTHIA8212==============
-  filesModel1.push_back (Form("/Path/to/HepMC/data/pythia%03d.hepmc.gz",nfile)); //add your files here with additional push_back()
+  //filesModel1.push_back (Form("/Path/to/HepMC/data/pythia%03d.hepmc.gz",nfile)); //add your files here with additional push_back()
+  filesModel1.push_back (Form("/mnt/lhcfs3/data4/Zhou/Simulation/LHC/pp13TeV/SIBYLL2.3c_mod/crmc_sibyll%03d.hepmc.gz",nfile)); //add your files here with additional push_back()
 
 
   DataManager data;
@@ -88,7 +89,8 @@ int main (int argc, char **argv){
 
   TFile* theOutFile;
   char outFileName[256];
-  sprintf(outFileName, "/Path/to/save/ROOT/file/PYTHIA8212/pythia%03d.root", nfile);
+  //sprintf(outFileName, "/Path/to/save/ROOT/file/PYTHIA8212/pythia%03d.root", nfile);
+  sprintf(outFileName, "/mnt/lhcfs3/data4/Zhou/Simulation/LHC/pp13TeV/SIBYLL2.3c_mod/sibyll%03d.root", nfile);
   cout << " ! Opening output file: " << outFileName << endl;
   theOutFile = new TFile(outFileName, "RECREATE");
   //theOutFile->SetCompressionLevel(1);

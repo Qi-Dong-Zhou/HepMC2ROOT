@@ -73,43 +73,36 @@ void Event::Build(int ev, HepMC::GenEvent *evt, float ptmin){
 
 
   //==================Sample 2 ====================
-  // HepMC::GenEvent::particle_const_iterator par = evt->particles_begin ();
-  // for (; par != evt->particles_end (); ++par){
-  //   HepMC::GenParticle* p = (*par);
-  //   if (p->status () != 1 && p->status () != 2) continue; //get final state particles. status == 2 are decayed particles, status == 4 is beam particles
-  //   if (TMath::Abs(p->momentum().eta()) < 8) continue; //Select the forward particle
-  //   ++fNtrack;
-  //   p->
-  //   AddParticle(p);
-  //   //std::cerr<< p->pdg_id()<<"  " <<p->momentum().x()<<"  "<<p->momentum().y() << std::endl;
-  // }
-
-
-  HepMC::GenEvent::vertex_const_iterator ver = evt->vertices_begin ();
-  for (; ver != evt->vertices_end (); ++ver){
-    int count = 0;
-    HepMC::GenVertex* v = (*ver);
-    HepMC::GenVertex::particles_out_const_iterator par_out = v->particles_out_const_begin ();
-    HepMC::GenVertex::particles_in_const_iterator par_in = v->particles_in_const_begin ();
-    for (; par_out != v->particles_out_const_end (); ++par_out){
-      
-      HepMC::GenParticle* p_out = (*par_out);
-      if (p_out->status () != 1 && p_out->status () != 2) continue; //get final state particles. status == 2 are decayed particles, status == 4 is beam particles
-      //if (TMath::Abs(p_out->momentum().eta()) < 8) continue; //Select the forward particle
-      if(count == 0){
-  	for (; par_in != v->particles_in_const_end (); ++par_in){
-  	  HepMC::GenParticle* p_in = (*par_in);
-  	  AddParticle(p_in, v);
-  	  ++fNtrack;
-  	  ++count;
-  	  //std::cerr<<p_in->pdg_id()<<"==="<<p_in->status()<<"++++"<<p_in->barcode()<<std::endl;
-  	}
-      }
-
-      AddParticle(p_out, v);
-      ++fNtrack;
-    }
+  HepMC::GenEvent::particle_const_iterator par = evt->particles_begin ();
+  for (; par != evt->particles_end (); ++par){
+    HepMC::GenParticle* p = (*par);
+    ++fNtrack;
+    AddParticle(p);
   }
+
+  // HepMC::GenEvent::vertex_const_iterator ver = evt->vertices_begin ();
+  // for (; ver != evt->vertices_end (); ++ver){
+  //   int count = 0;
+  //   HepMC::GenVertex* v = (*ver);
+  //   HepMC::GenVertex::particles_out_const_iterator par_out = v->particles_out_const_begin ();
+  //   HepMC::GenVertex::particles_in_const_iterator par_in = v->particles_in_const_begin ();
+  //   for (; par_out != v->particles_out_const_end (); ++par_out){
+      
+  //     HepMC::GenParticle* p_out = (*par_out);
+  //     if(count == 0){
+  // 	for (; par_in != v->particles_in_const_end (); ++par_in){
+  // 	  HepMC::GenParticle* p_in = (*par_in);
+  // 	  AddParticle(p_in, v);
+  // 	  ++fNtrack;
+  // 	  ++count;
+  // 	  //std::cerr<<p_in->pdg_id()<<"==="<<p_in->status()<<"++++"<<p_in->barcode()<<std::endl;
+  // 	}
+  //     }
+
+  //     AddParticle(p_out, v);
+  //     ++fNtrack;
+  //   }
+  // }
 
 
   SetNtrack( fNtrack);
@@ -126,6 +119,70 @@ void Event::SetHeader(int run, int a1run, int a2run){
   fEvtHdr.Set(run, a1run, a2run);
 }
 
+TParticle *Event::AddParticle(HepMC::GenParticle* p){
+
+  TParticle *par = (TParticle*)fParticle->ConstructedAt(fNtrack++);
+
+  par->SetPdgCode(p->pdg_id ());
+
+  par->SetStatusCode(p->status ());
+
+  par->SetMomentum(p->momentum ().px (),
+              p->momentum ().py (),
+              p->momentum ().pz (),
+              p->momentum ().e ()
+              );
+  
+
+  Bool_t  count_one = kFALSE;
+  //if(p->production_vertex()){
+  if(p->status() == 1 || p->status() == 2){
+
+    for ( HepMC::GenVertex::particle_iterator ancestor 
+	    = p->production_vertex()->
+	    particles_begin(HepMC::ancestors);
+	  ancestor != p->production_vertex()->
+	    particles_end(HepMC::ancestors); 
+	  ++ancestor ) {
+      par->SetWeight( (*ancestor)->barcode() ); // save the barcode of origin proton: 1 or 2
+      count_one = kTRUE;
+      if(count_one) break;
+    }
+      
+    for ( HepMC::GenVertex::particle_iterator mother 
+	    = p->production_vertex()->
+	    particles_begin(HepMC::parents);
+	  mother != p->production_vertex()->
+	    particles_end(HepMC::parents); 
+	  ++mother ) {
+      //std::cerr << (*mother)->barcode() << std::endl;
+      par->SetFirstMother( (*mother)->barcode() ); // The mother only 2 in TPartilce, 
+      par->SetLastMother( (*mother)->pdg_id() ); // In principe only one mother in HepMC output, first mother to save bar code, last mother to save pdg code
+    }
+
+    for ( HepMC::GenVertex::particle_iterator daughter 
+	    = p->production_vertex()->
+	    particles_begin(HepMC::children);
+	  daughter != p->production_vertex()->
+	    particles_end(HepMC::children); 
+	  ++daughter ) {
+      par->SetFirstDaughter( (*daughter)->barcode() ); // The mother only 2 in TPartilce, 
+      par->SetLastDaughter( (*daughter)->barcode() ); // In principe only one mother in HepMC output, first mother to save bar code, last mother to save pdg code
+    }
+    //std::cerr << "pass" << std::endl;
+    par->SetProductionVertex(p->production_vertex ()->position ().x (),
+			     p->production_vertex ()->position ().y (),
+			     p->production_vertex ()->position ().z (),
+			     p->production_vertex ()->position ().t ()
+			     );
+  }
+  //Add the needed particle information here
+
+  fLastParticle = par;
+
+  return par;
+}
+
 
 TParticle *Event::AddParticle(HepMC::GenParticle* p, HepMC::GenVertex* v){
 
@@ -136,15 +193,20 @@ TParticle *Event::AddParticle(HepMC::GenParticle* p, HepMC::GenVertex* v){
   par->SetStatusCode(p->status ());
 
   HepMC::GenVertex::particles_in_const_iterator par_in = v->particles_in_const_begin ();
+      
   for (; par_in != v->particles_in_const_end (); ++par_in){
     HepMC::GenParticle* p_in = (*par_in);
-    if(p->barcode() != p_in->barcode() && p_in->status() == 2){ //itself is not mother particle and the mother is decayed particle
-      par->SetFirstMother(p_in->barcode());
+    //std::cerr << p->barcode() << "  "  <<p_in->barcode() << "  " ;
+
+    if(p->barcode() != p_in->barcode() && (p_in->status() == 2 || p_in->status() == 4)){ //itself is not mother particle and the mother is decayed particle
+      par->SetFirstMother(p_in->barcode()); // The first mother used for matching their daughters
+      par->SetMother(1, p_in->pdg_id()); // The same as SetLastMother() 
     }
     //std::cerr<<p_in->pdg_id()<<"==="<<p_in->barcode()<<std::endl;
   }
+  //std::cerr << std::endl;
   
-  par->SetFirstDaughter(p->barcode());
+  par->SetFirstDaughter(p->barcode()); // Save its own barcode to the first daughter used for matching its mother
 
   par->SetMomentum(p->momentum ().px (),
               p->momentum ().py (),
@@ -152,12 +214,47 @@ TParticle *Event::AddParticle(HepMC::GenParticle* p, HepMC::GenVertex* v){
               p->momentum ().e ()
               );
 
-  if(p->status() == 1){
+  Bool_t  count_one = kFALSE;
+  //if(p->production_vertex()){
+  if(p->status() == 1 || p->status() == 2){
+    
+    for ( HepMC::GenVertex::particle_iterator ancestor 
+	    = p->production_vertex()->
+	    particles_begin(HepMC::ancestors);
+	  ancestor != p->production_vertex()->
+	    particles_end(HepMC::ancestors); 
+	  ++ancestor ) {
+      par->SetWeight( (*ancestor)->barcode() ); // save the barcode of origin proton: 1 or 2
+      count_one = kTRUE;
+      if(count_one) break;
+    }
+      
+    for ( HepMC::GenVertex::particle_iterator mother 
+	    = p->production_vertex()->
+	    particles_begin(HepMC::parents);
+	  mother != p->production_vertex()->
+	    particles_end(HepMC::parents); 
+	  ++mother ) {
+      //std::cerr << (*mother)->barcode() << std::endl;
+      par->SetFirstMother( (*mother)->barcode() ); // The mother only 2 in TPartilce, 
+      par->SetLastMother( (*mother)->pdg_id() ); // In principe only one mother in HepMC output, first mother to save bar code, last mother to save pdg code
+    }
+
+    for ( HepMC::GenVertex::particle_iterator daughter 
+	    = p->production_vertex()->
+	    particles_begin(HepMC::children);
+	  daughter != p->production_vertex()->
+	    particles_end(HepMC::children); 
+	  ++daughter ) {
+      par->SetFirstDaughter( (*daughter)->barcode() ); // The mother only 2 in TPartilce, 
+      par->SetLastDaughter( (*daughter)->barcode() ); // In principe only one mother in HepMC output, first mother to save bar code, last mother to save pdg code
+    }
+    //std::cerr << "pass" << std::endl;
     par->SetProductionVertex(p->production_vertex ()->position ().x (),
-    			     p->production_vertex ()->position ().y (),
-    			     p->production_vertex ()->position ().z (),
-    			     p->production_vertex ()->position ().t ()
-    			     );
+			     p->production_vertex ()->position ().y (),
+			     p->production_vertex ()->position ().z (),
+			     p->production_vertex ()->position ().t ()
+			     );
   }
   //Add the needed particle information here
 
